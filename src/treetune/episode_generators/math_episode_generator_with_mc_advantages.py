@@ -127,10 +127,10 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                 self.distributed_state.wait_for_everyone()
                 unique_results = Dataset.load_from_disk(str(val_est_result_path))
 
-            kill_vllm_server()
-            release_memory()
-            vllm_cleanup_fn()
-            release_memory()
+            # kill_vllm_server()
+            # release_memory()
+            # vllm_cleanup_fn()
+            # release_memory()
 
             if len(metrics) > 0:
                 self._cloud_log(metrics)
@@ -183,6 +183,12 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                     traj["values"][idx] = 0.0
                 traj["values"][-1] = None # the last value should always be 0
             value_estimation_results = None
+
+        # Always clean up vLLM after trajectories are ready
+        kill_vllm_server()
+        release_memory()
+        vllm_cleanup_fn()
+        release_memory()
 
 
         episodes = self._create_episodes(
