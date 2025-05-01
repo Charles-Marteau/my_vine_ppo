@@ -29,8 +29,6 @@ local num_mc_rollouts = 1;
 
             no_cache: true,
         },
-
-        constant_advantage_value: 5.0,
     },
 
     trainer+: {

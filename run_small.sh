@@ -3,7 +3,7 @@
 set -e
 
 # # ✅ Authenticate to WandB
-# export WANDB_API_KEY=""
+export WANDB_API_KEY="70b96873b56f3f8d08f98ad683f6cf275f5322b3"
 
 # ✅ Set the project you created
 export WANDB_PROJECT="my_vine_ppo"
@@ -15,8 +15,8 @@ export WANDB_PROJECT="my_vine_ppo"
 git config --global --add safe.directory /src
 
 # 🧪 Configs
-CONFIGSTR="configs/polIter_rho1bSft2_vineppo_GSM8K.jsonnet,configs/trainers/devBz16.jsonnet"
-APP_DIRECTORY="experiments/vineppo_rho1b_gsm8k_1gpu_small_batch"
+CONFIGSTR="configs/polIter_rho1bSft2_const5p0_GSM8K.jsonnet,configs/trainers/devBz16.jsonnet"
+APP_DIRECTORY="experiments/const5p0_rho1b_gsm8k_1gpu_small_batch"
 
 export APP_SEED="2746318213"
 
