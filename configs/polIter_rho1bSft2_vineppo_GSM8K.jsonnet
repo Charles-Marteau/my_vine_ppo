@@ -23,5 +23,5 @@ local total_num_iterations = 10;
 }
 // + (import 'sft_rho1b_for_gsm8k_eval.jsonnet')
 + (import 'episode_generators/9rolls.jsonnet')
-+ (import 'trainers/refKl0.0001.jsonnet')
++ (import 'trainers/refKl0.0.jsonnet') 
 + (import 'trainers/klLoss.jsonnet')

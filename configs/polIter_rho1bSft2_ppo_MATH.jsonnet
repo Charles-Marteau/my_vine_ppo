@@ -10,10 +10,10 @@ local math_task = (import 'tasks/math_inplace_no_answer_prefix.jsonnet') + {
     ensure_fit_in_context_size: false,
 };
 
-// local num_episodes_per_iteration = 512;
-local num_episodes_per_iteration = 4;
-// local num_rollouts_per_sample = 8;
-local num_rollouts_per_sample = 2;
+local num_episodes_per_iteration = 512;
+// local num_episodes_per_iteration = 4;
+local num_rollouts_per_sample = 8;
+// local num_rollouts_per_sample = 2;
 local num_dataset_samples_per_iteration = num_episodes_per_iteration / num_rollouts_per_sample;
 local total_num_iterations = 1000;
 
@@ -101,14 +101,16 @@ local sampling_temperature = 0.6;
         critic_deepspeed_config: (import 'deepspeed/zero_0.jsonnet'),
 
         // To prevent OOM errors
-        report_entropy: false,
+        // report_entropy: false,
+        report_entropy: true,
 
         general_training_args+: {
-            // target_train_batch_size: 64,
-            target_train_batch_size: 4,
-            // per_device_train_batch_size: null,  // Will be auto computed
-            per_device_train_batch_size: 4,
-            gradient_accumulation_steps: null,
+            target_train_batch_size: 64,
+            // target_train_batch_size: 4,
+            per_device_train_batch_size: null,  // Will be auto computed
+            // per_device_train_batch_size: 4,
+            gradient_accumulation_steps: 1,
+            // gradient_accumulation_steps: null,
 
             save_steps: 40,
             checkpoint_keep_steps: 40,

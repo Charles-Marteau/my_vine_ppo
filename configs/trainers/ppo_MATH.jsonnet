@@ -64,7 +64,8 @@ local ds_stage_2_w_cpu_optimizer = (import '../deepspeed/zero_2.jsonnet') + {
             cliprange_value: 0.2,
 
             whiten_rewards: false,
-            whiten_advantages: true,
+            // whiten_advantages: true,
+            whiten_advantages: false,
         },
 
         general_training_args: {
