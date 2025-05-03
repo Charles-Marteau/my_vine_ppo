@@ -3,7 +3,7 @@
 set -e
 
 # # ✅ Authenticate to WandB
-export WANDB_API_KEY="46d1f6cc085f184fc5263b0621273551e4ba7fbf"
+export WANDB_API_KEY=""
 
 # ✅ Set the project you created
 export WANDB_PROJECT="my_vine_ppo"
@@ -14,9 +14,9 @@ export WANDB_PROJECT="my_vine_ppo"
 # 🛠️ Fix Git safe directory warning inside Docker
 git config --global --add safe.directory /src
 
-# 🧪 Configs
-CONFIGSTR="configs/polIter_rho1bSft2_const5p0_GSM8K.jsonnet,configs/trainers/devBz16.jsonnet"
-APP_DIRECTORY="experiments/const5p0_rho1b_gsm8k_1gpu_small_batch"
+# 🧪 Configs (set by run_batch.sh script)
+# CONFIGSTR="configs/polIter_rho1bSft2_const5p0_GSM8K.jsonnet,configs/trainers/devBz16.jsonnet"
+# APP_DIRECTORY="experiments/const5p0_rho1b_gsm8k_1gpu_small_batch"
 
 export APP_SEED="2746318213"
 
