@@ -242,7 +242,7 @@ class PolicyIterationRuntime(DistributedRuntime):
             if is_local_main_process:
                 logger.info(f"Finished iteration {iteration}")
 
-        trainer.save_final_checkpoint()
+        # trainer.save_final_checkpoint() # We disable this for the moment
 
         if (
             need_to_minimize_stored_files()
