@@ -18,6 +18,8 @@ from treetune.episode_generators.base_episode_generator import Episode
 from treetune.inference_strategies import InferenceStrategy
 from treetune.logging_utils import get_logger
 
+from collections import defaultdict
+
 logger = get_logger(__name__)
 
 
@@ -28,6 +30,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
         value_estimation_inference_strategy: Lazy[InferenceStrategy],
         max_step_for_value_estimation: Optional[int] = None,
         constant_advantage_value: Optional[float] = None,
+        grpo_advantage: Optional[float] = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -35,6 +38,9 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
         self.max_step_for_value_estimation = max_step_for_value_estimation
         self._logger = logger
         self.constant_advantage_value = constant_advantage_value
+        self.grpo_advantage = grpo_advantage
+        if self.grpo_advantage:
+            assert self.constant_advantage_value is None, "Cannot have both GRPO adv and constant adv..."
 
     def _run_inference(
         self,
@@ -90,7 +96,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
         #####################################################################################
         # Estimate the value of each state in the trajectories using Monte Carlo rollouts
         #####################################################################################
-        if self.constant_advantage_value is None:
+        if self.constant_advantage_value is None and not self.grpo_advantage:
             (unique_requests, all_requests, all_reqs_to_unique_key) = self._create_value_estimation_requests(trajectories, results_root_dir)
 
             val_est_result_path = results_root_dir.parent / "unique_value_estimation_result_ds"
@@ -223,18 +229,60 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
             "values": [],
         }
         episodes = []
+
+        # GRPO
+        if self.grpo_advantage:
+            query_token_ids_to_scores = defaultdict(list)
+
+            for traj in trajectories:
+                key = tuple(traj["query_token_ids"])
+                query_token_ids_to_scores[key].append(traj["score"])
+
+            # Check that all queries have the same number of attempts
+            traj = trajectories[0]
+            key = tuple(traj["query_token_ids"])
+            num_rollouts_per_sample = len(query_token_ids_to_scores[key])
+            assert all(
+                len(v) == num_rollouts_per_sample for v in query_token_ids_to_scores.values()
+                ), "Inconsistent number of attempts among queries"
+
+            query_token_ids_to_average_score = {
+                key: float(np.mean(scores)) for key, scores in query_token_ids_to_scores.items()
+            }
+
+            for traj in trajectories:
+                key = tuple(traj["query_token_ids"])
+                traj["average_score"] = query_token_ids_to_average_score[key]
+
+        average_first_tok_adv = 0
         for traj in trajectories:
+            advs = self._compute_token_advantages(traj)
+            average_first_tok_adv += advs[0]
+            assert all(a is not None for a in advs), "Found undertermined per tok adv"
+            assert isinstance(advs[0], float), "Adv should be a float"
+            assert len(advs) == len(traj["response_token_ids"]), "Length of adv list doesn't match response length"
+            if self.constant_advantage_value is not None or self.grpo_advantage:
+                # advantage should be the same for all tok of the episode
+                assert all(a == advs[0] for a in advs), "Per episode adv should be constant"
+
             episode = Episode(
                 query_token_ids=traj["query_token_ids"],
                 response_token_ids=traj["response_token_ids"],
                 scores=traj["score"],
-                advantages=self._compute_token_advantages(traj),
+                advantages=advs,
             )
             episodes.append(episode)
 
             metrics["num_reasoning_steps"].append(len(traj["steps"]))
             metrics["is_unfinished_response"].append(traj["is_unfinished_response"])
             metrics["values"].extend(traj["values"])
+
+        average_first_tok_adv = average_first_tok_adv / len(trajectories)
+        if self.constant_advantage_value:
+            assert average_first_tok_adv == self.constant_advantage_value, "Average per episode adv should match constant_advantage_value"
+        elif self.grpo_advantage:
+            assert abs(average_first_tok_adv) < 1e-6, "Average per episode adv should vanish"
+
 
         if results_root_dir is not None:
             with open(results_root_dir / f"trajectories.pkl", "wb") as f:
@@ -375,7 +423,25 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                 char_advantages[j] = advantages[i]
         assert np.all(char_advantages != -7777777)
 
-        if self.constant_advantage_value is None:
+        if self.constant_advantage_value:
+            token_advantages = [self.constant_advantage_value] * len(response_token_ids)
+
+            if has_eos:
+                token_advantages.append(token_advantages[-1])
+
+            return token_advantages
+        elif self.grpo_advantage:
+            assert trajectory[
+                "average_score"
+                ] is not None, "Missing the average score in GRPO advantage computation!"
+            advantage_value = trajectory["score"] - trajectory["average_score"]
+            token_advantages = [advantage_value] * len(response_token_ids)
+
+            if has_eos:
+                token_advantages.append(token_advantages[-1])
+
+            return token_advantages
+        else:
             # Find the advantage of response tokens from the advantage of its characters
             token_advantages = [None] * len(response_token_ids)
             for i in range(len(token_advantages)):
@@ -388,13 +454,8 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
 
             # noinspection PyTypeChecker
             return token_advantages
-        else:
-            token_advantages = [self.constant_advantage_value] * len(response_token_ids)
+        
 
-            if has_eos:
-                token_advantages.append(token_advantages[-1])
-
-            return token_advantages
 
     def _compute_step_advantages(self, trajectory: Dict[str, Any]):
         step_rewards = trajectory["step_rewards"]
