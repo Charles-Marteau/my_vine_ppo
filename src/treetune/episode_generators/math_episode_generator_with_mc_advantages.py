@@ -30,7 +30,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
         value_estimation_inference_strategy: Lazy[InferenceStrategy],
         max_step_for_value_estimation: Optional[int] = None,
         constant_advantage_value: Optional[float] = None,
-        grpo_advantage: Optional[float] = False,
+        grpo_advantage: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)

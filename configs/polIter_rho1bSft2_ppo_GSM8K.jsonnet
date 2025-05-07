@@ -18,7 +18,7 @@ local total_num_iterations = 650;
     },
     num_iterations: total_num_iterations,
 }
-+ (import 'sft_rho1b_for_gsm8k_eval.jsonnet')
+// + (import 'sft_rho1b_for_gsm8k_eval.jsonnet')
 + (import 'trainers/lam1.jsonnet')
 + (import 'trainers/refKl0.0001.jsonnet')
 + (import 'trainers/klLoss.jsonnet')
