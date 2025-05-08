@@ -316,7 +316,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
         value_estimation_results: Dataset,
         iteration: int,
     ) -> List[Dict[str, Any]]:
-        if self.constant_advantage_value is not None:
+        if self.constant_advantage_value is not None or self.grpo_advantage:
             # Nothing to do
             return trajectories
         metrics = {

@@ -1,4 +1,4 @@
-local num_mc_rollouts = 1;
+local num_mc_rollouts = 1; # won't be used when grpo_advantage = True or constant_advantage_value is not None
 
 (import 'polIter_rho1bSft2_ppo_MATH.jsonnet')
 + (import 'trainers/no_critic.jsonnet')
@@ -6,7 +6,7 @@ local num_mc_rollouts = 1;
     episode_generator+: {
         type: 'math_episode_generator_w_mc_advantages',
 
-        value_estimation_inference_strategy+: {
+        value_estimation_inference_strategy+: { # won't be used when grpo_advantage = True or constant_advantage_value is not None
             type: 'cot',
 
             max_concurrent_programs: 512,
@@ -98,6 +98,6 @@ local num_mc_rollouts = 1;
     //     },
     // ],
 }
-+ (import 'episode_generators/9rolls.jsonnet')
++ (import 'episode_generators/9rolls.jsonnet') # won't be used when grpo_advantage = True or constant_advantage_value is not None
 + (import 'trainers/refKl0.0001.jsonnet')
 + (import 'trainers/klLoss.jsonnet')

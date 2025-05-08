@@ -1,7 +1,7 @@
 local hf_model_name = 'realtreetune/rho-1b-sft-GSM8K';
 local task = (import 'tasks/gsm8k_orig_format.jsonnet');
 local total_num_iterations = 650;
-// local total_num_iterations = 1;
+// local total_num_iterations = 2;
 
 
 (import 'polIter_rho1bSft2_vineppo_MATH.jsonnet')
@@ -22,6 +22,7 @@ local total_num_iterations = 650;
     num_iterations: total_num_iterations,
 }
 // + (import 'sft_rho1b_for_gsm8k_eval.jsonnet')
-+ (import 'episode_generators/9rolls.jsonnet')
-+ (import 'trainers/refKl0.0.jsonnet') 
++ (import 'episode_generators/9rolls.jsonnet') # won't be used when grpo_advantage = True or constant_advantage_value is not None
+// + (import 'trainers/refKl0.0.jsonnet') 
++ (import 'trainers/refKl0.0001.jsonnet')
 + (import 'trainers/klLoss.jsonnet')
