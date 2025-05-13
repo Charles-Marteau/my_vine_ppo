@@ -542,6 +542,8 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
             "finish_reason_is_length": [],
             "trajectory_bleu": [],
             "num_unique_responses": [],
+            "truncation_failed": [],
+            "length_capped_token_size": [],
         }
         trajectories = []
         for idx, instance in enumerate(inference_results):
@@ -560,10 +562,29 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
 
                 metrics["finish_reason_is_length"].append(finish_reason == "length")
 
+                ###############################################################################
+                if finish_reason == "length":
+                    logger.info(f"""\n\nFound a transcript with finish_reason == 'length'!
+                    
+{query_text}{response_text}
+                    
+""")
+                    query_token_ids, response_token_ids, _ = (
+                    self._tokenize_trajectory(
+                        {"query_text": query_text, "response_text": response_text},
+                        is_unfinished_response=True,
+                        return_offsets=True,
+                        )
+                    )
+                    token_size = len(query_token_ids) + len(response_token_ids)
+                    metrics["length_capped_token_size"].append(token_size)
+                ###############################################################################
+
                 try:
                     new_response_text = self._truncate_response_to_max_length(
                         query_text, response_text
                     )
+                    metrics["truncation_failed"].append(False)
                 except Exception as e:
                     logger.error(
                         (
@@ -572,6 +593,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                             f"Response: `{response_text}`"
                         )
                     )
+                    metrics["truncation_failed"].append(True)
                     continue
 
                 is_truncated = new_response_text != response_text

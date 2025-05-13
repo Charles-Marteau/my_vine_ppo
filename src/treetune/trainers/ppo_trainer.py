@@ -840,6 +840,7 @@ class PPOTrainer(DeepSpeedPolicyTrainer):
             **actor_metrics,
             **critic_metrics,
         }
+
         if returns is not None:
             metrics["returns"] = masked_mean(returns, shifted_labels_mask).detach()
         if non_score_rewards is not None:

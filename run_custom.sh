@@ -3,7 +3,7 @@
 set -e
 
 # # ✅ Authenticate to WandB
-export WANDB_API_KEY=""
+export WANDB_API_KEY="ddf50f843451c580ff8fd99ca9fc0f05038fd1bd"
 
 # ✅ Set the project you created
 export WANDB_PROJECT="my_vine_ppo"
