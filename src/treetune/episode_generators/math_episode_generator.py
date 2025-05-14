@@ -28,6 +28,7 @@ class MATHRewardFunction(RewardFunction):
         math_task: Task,
         penalize_unfinished_response: bool = False,
         unfinished_response_penalty: float = -1.0,
+        parse_failure_penalty: float = -1.0,
         timeout: Optional[int] = None,
     ):
         assert isinstance(math_task, (MATH, GSM8K))
@@ -35,10 +36,14 @@ class MATHRewardFunction(RewardFunction):
         self.math_task = math_task
         self.penalize_unfinished_response = penalize_unfinished_response
         self.unfinished_response_penalty = unfinished_response_penalty
+        self.parse_failure_penalty = parse_failure_penalty
         self.timeout = timeout
 
     def get_unfinished_response_penalty(self) -> float:
         return float(self.unfinished_response_penalty)
+    
+    def get_parse_failure_penalty(self) -> float:
+        return float(self.parse_failure_penalty)
 
     def __call__(
         self, query: str, response: str, dataset_instance: Dict[str, Any]

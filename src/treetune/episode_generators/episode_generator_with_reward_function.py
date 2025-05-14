@@ -20,6 +20,9 @@ logger = get_logger(__name__)
 class RewardFunction(Registrable):
     def get_unfinished_response_penalty(self) -> float:
         raise NotImplementedError
+    
+    def get_parse_failure_penalty(self) -> float:
+        return NotImplementedError
 
     def __call__(
         self, query: str, response: str, dataset_instance: Dict[str, Any]

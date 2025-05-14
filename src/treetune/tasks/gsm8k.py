@@ -10,6 +10,19 @@ from datasets import (
 from treetune import logging_utils
 from treetune.tasks import Task
 
+
+
+# parsing errors
+class MultipleAnswerPrefixError(ValueError):
+    pass
+
+class ReconstructionMismatchError(ValueError):
+    pass
+
+class FinalLengthMismatchError(ValueError):
+    pass
+
+
 logger = logging_utils.get_logger(__name__)
 
 FIND_NUMBERS_REGEX = re.compile(
@@ -62,6 +75,7 @@ class GSM8K(Task):
     def extract_gold_answer_from_text(self, text: str) -> str:
         return text.split("####")[1].strip()
 
+
     def split_solution_into_intermediate_steps(self, solution: str) -> List[int]:
         """
         Split the solution into reasoning steps.
@@ -71,10 +85,6 @@ class GSM8K(Task):
 
         Returns:
             A list of indices where each index corresponds to the start of a reasoning step.
-            Example:
-            >>> solution = '...'
-            >>> indices = split_solution_into_reasoning_steps(solution)
-            >>> steps = [solution[indices[i]:indices[i+1]] for i in range(len(indices) - 1)]
         """
         assert self.use_original_format, "This method is only for original format"
         assert self.intermediate_step_delimiter is not None
@@ -89,6 +99,13 @@ class GSM8K(Task):
             if len(solution_parts) < 2:
                 sol_without_answer, answer = solution, None
             else:
+                if len(solution_parts) > 2:
+                    logger.error(
+                        f"Multiple occurrences of answer_prefix `{answer_prefix}` in solution:\n\n{solution}"
+                    )
+                    raise MultipleAnswerPrefixError(
+                        f"Multiple occurrences of answer_prefix `{answer_prefix}`"
+                    )
                 sol_without_answer, answer = solution_parts
 
         steps = sol_without_answer.split(delimiter)
@@ -102,13 +119,10 @@ class GSM8K(Task):
 
         if first_non_empty_step_idx is not None and first_non_empty_step_idx > 0:
             new_first_step = delimiter.join(steps[: first_non_empty_step_idx + 1])
-
-            steps = [new_first_step] + steps[first_non_empty_step_idx + 1 :]
+            steps = [new_first_step] + steps[first_non_empty_step_idx + 1:]
 
         if answer is not None:
-            # We want to merge the last step with the answer
-
-            # Find last non-empty step index
+            # Merge last non-empty step with answer
             last_non_empty_step_idx = None
             for i in range(len(steps) - 1, -1, -1):
                 if steps[i].strip() != "":
@@ -116,20 +130,19 @@ class GSM8K(Task):
                     break
 
             if last_non_empty_step_idx is None:
-                # Then it means the entire solution is a single step
                 last_non_empty_step_idx = 0
 
             new_last_step = delimiter.join(steps[last_non_empty_step_idx:])
-            # Also merge the last step with the answer
             new_last_step = f"{new_last_step}{answer_prefix}{answer}"
             steps = steps[:last_non_empty_step_idx] + [new_last_step]
 
         reconstructed_solution = delimiter.join(steps)
-        assert (
-            reconstructed_solution == solution
-        ), f"{reconstructed_solution} != {solution}"
+        if reconstructed_solution != solution:
+            raise ReconstructionMismatchError(
+                f"Reconstructed solution does not match original.\n\nExpected:\n{solution}\n\nGot:\n{reconstructed_solution}"
+            )
 
-        # Find the indices of the reasoning steps
+        # Find step indices
         indices = [0]
         for i, step in enumerate(steps):
             if i == 0:
@@ -137,9 +150,13 @@ class GSM8K(Task):
             else:
                 indices.append(indices[-1] + len(step) + len(delimiter))
 
-        assert indices[-1] == len(solution), f"{indices[-1]} != {len(solution)}"
+        if indices[-1] != len(solution):
+            raise FinalLengthMismatchError(
+                f"Final index {indices[-1]} != len(solution) {len(solution)}"
+            )
 
         return indices
+
 
     def grade_answer(
         self,

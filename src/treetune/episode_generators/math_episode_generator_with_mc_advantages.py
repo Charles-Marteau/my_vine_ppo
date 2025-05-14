@@ -17,6 +17,11 @@ from treetune.episode_generators import EpisodeGenerator, MathEpisodeGenerator
 from treetune.episode_generators.base_episode_generator import Episode
 from treetune.inference_strategies import InferenceStrategy
 from treetune.logging_utils import get_logger
+from treetune.tasks.gsm8k import (
+    MultipleAnswerPrefixError, 
+    ReconstructionMismatchError, 
+    FinalLengthMismatchError,
+)
 
 from collections import defaultdict
 
@@ -536,6 +541,9 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
     ) -> List[Dict[str, Any]]:
         metrics = {
             "parse_failed": [],
+            "parse_failed_multiple_answer_pref": [],
+            "parse_failed_reconstruction_mis": [],
+            "parse_failed_final_length_mis": [],
             "once_hit": [],
             "is_unfinished_response": [],
             "is_truncated_response": [],
@@ -545,6 +553,12 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
             "truncation_failed": [],
             "length_capped_token_size": [],
         }
+        parse_failure_keys = {
+                        MultipleAnswerPrefixError: "parse_failed_multiple_answer_pref",
+                        ReconstructionMismatchError: "parse_failed_reconstruction_mis",
+                        FinalLengthMismatchError: "parse_failed_final_length_mis",
+        }
+
         trajectories = []
         for idx, instance in enumerate(inference_results):
             # noinspection PyTypeChecker
@@ -605,12 +619,16 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                     response_text = new_response_text
                     full_text = query_text + response_text
 
+                parsing_succeeded = False
                 try:
                     # noinspection PyUnresolvedReferences
                     indices: List[int] = (
                         self.task.split_solution_into_intermediate_steps(response_text)
                     )
                     metrics["parse_failed"].append(False)
+                    for key in parse_failure_keys.values():
+                        metrics[key].append(False)
+                    parsing_succeeded = True
                 except Exception as e:
                     logger.error(
                         (
@@ -619,34 +637,55 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                         )
                     )
                     metrics["parse_failed"].append(True)
-                    continue
+                    for key in parse_failure_keys.values():
+                        metrics[key].append(False)
+
+                    error_key = parse_failure_keys.get(type(e))
+                    if error_key:
+                        metrics[error_key][-1] = True
+                        logger.warning(f"Parse failed due to {error_key}.")
+                    else:
+                        logger.warning(f"Parse failed due to unexpected error: {type(e).__name__} — {e}")
+
+                    # continue    
+                    # Add fallback behavior instead of continue
+                    traj_score = self.reward_function.get_parse_failure_penalty()
+                    is_unfinished_response = True
+                    steps = [response_text]
+                    indices = [0, len(response_text)]
+                    step_rewards = [traj_score]
 
                 all_responses.append(response_text)
 
-                assert (indices[0], indices[-1]) == (0, len(response_text))
-                steps = [
-                    response_text[indices[i] : indices[i + 1]]
-                    for i in range(len(indices) - 1)
-                ]
-                # This is trivial since steps are directly extracted
-                # from the response text using the indices.
-                # We put it here just for readability.
-                assert self.reasoning_step_delimiter.join(steps) == response_text
+                if parsing_succeeded:
+                    # Parsing succeeded: use fine-grained step splitting and compute reward normally
+                    assert (indices[0], indices[-1]) == (0, len(response_text))
+                    steps = [
+                        response_text[indices[i] : indices[i + 1]]
+                        for i in range(len(indices) - 1)
+                    ]
+                    # This is trivial since steps are directly extracted
+                    # from the response text using the indices.
+                    # We put it here just for readability.
+                    assert self.reasoning_step_delimiter.join(steps) == response_text
 
-                traj_score, is_unfinished_response = self.reward_function(
-                    query_text, response_text, instance
-                )
-                is_unfinished_response = (
-                    is_unfinished_response or finish_reason == "length" or is_truncated
-                )
+                    traj_score, is_unfinished_response = self.reward_function(
+                        query_text, response_text, instance
+                    )
+                    is_unfinished_response = (
+                        is_unfinished_response or finish_reason == "length" or is_truncated
+                    )
+                    if is_unfinished_response:
+                        traj_score = self.reward_function.get_unfinished_response_penalty()
+
+                    step_rewards = [0.0] * len(steps)
+                    step_rewards[-1] = traj_score
+                else: 
+                    # Parsing failed: use fallback trajectory values from except block
+                    pass
+
                 metrics["is_unfinished_response"].append(is_unfinished_response)
-
-                if is_unfinished_response:
-                    traj_score = self.reward_function.get_unfinished_response_penalty()
                 all_scores.append(traj_score)
-
-                step_rewards = [0.0] * len(steps)
-                step_rewards[-1] = traj_score
 
                 query_token_ids, response_token_ids, offsets = (
                     self._tokenize_trajectory(
