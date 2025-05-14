@@ -674,7 +674,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                     traj_score, is_unfinished_response = self.reward_function(
                         query_text, response_text, instance
                     )
-                    metrics["grade"][-1] = traj_score # override the False     default
+                    metrics["grade"][-1] = bool(traj_score) # override the False default
                     is_unfinished_response = (
                         is_unfinished_response or finish_reason == "length" or is_truncated
                     )

@@ -26,8 +26,8 @@ local question_template = prompt_library.prompt_library.tree.question_template;
 
         reward_function: {
             type: 'math_reward_function',
-            penalize_unfinished_response: true,
-            unfinished_response_penalty: 0.0,
+            penalize_unfinished_response: false,
+            unfinished_response_penalty: -1.0,
             math_task: $.episode_generator.task,
         },
         reasoning_step_delimiter: '\n',
