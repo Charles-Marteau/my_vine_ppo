@@ -552,6 +552,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
             "num_unique_responses": [],
             "truncation_failed": [],
             "length_capped_token_size": [],
+            "grade": [],
         }
         parse_failure_keys = {
                         MultipleAnswerPrefixError: "parse_failed_multiple_answer_pref",
@@ -647,7 +648,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                     else:
                         logger.warning(f"Parse failed due to unexpected error: {type(e).__name__} — {e}")
 
-                    # continue    
+                    # continue    # old behavior, can yield strong bias in sampling dist
                     # Add fallback behavior instead of continue
                     traj_score = self.reward_function.get_parse_failure_penalty()
                     is_unfinished_response = True
@@ -657,6 +658,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
 
                 all_responses.append(response_text)
 
+                metrics["grade"].append(False)
                 if parsing_succeeded:
                     # Parsing succeeded: use fine-grained step splitting and compute reward normally
                     assert (indices[0], indices[-1]) == (0, len(response_text))
@@ -672,6 +674,7 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                     traj_score, is_unfinished_response = self.reward_function(
                         query_text, response_text, instance
                     )
+                    metrics["grade"][-1] = traj_score # override the False     default
                     is_unfinished_response = (
                         is_unfinished_response or finish_reason == "length" or is_truncated
                     )
@@ -684,7 +687,9 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
                     # Parsing failed: use fallback trajectory values from except block
                     pass
 
-                metrics["is_unfinished_response"].append(is_unfinished_response)
+                metrics["is_unfinished_response"].append(
+                    is_unfinished_response
+                    ) # captures both parse failed and is_unfinished case of parse succeeds
                 all_scores.append(traj_score)
 
                 query_token_ids, response_token_ids, offsets = (
